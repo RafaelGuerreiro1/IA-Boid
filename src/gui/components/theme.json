@@ -1,0 +1,17 @@
+{
+  "panel":
+  {
+    "colours":
+    {
+      "dark_bg":"#00000000",
+      "normal_border": "#00000000"
+    },
+    "misc":
+    {
+      "shape": "rounded_rectangle",
+      "shape_corner_radius": "10",
+      "border_width": "0",
+      "shadow_width": "0"
+    }
+  }
+}

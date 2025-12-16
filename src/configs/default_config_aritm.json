@@ -1,0 +1,43 @@
+{
+  "screen": {
+    "dimensions": {
+      "WIDTH": 1000,
+      "HEIGHT": 700
+    },
+    "margins": {
+      "MARGIN_FROM_EDGE": 150
+    },
+    "general": {
+      "TITLE": "pyBoidz",
+      "FPS": 60
+    }
+  },
+  "boids": {
+    "NUM_BOIDS": 200,
+    "NUM_PREDATORS": 1,
+    "MAX_SPEED": 5,
+    "MIN_SPEED": 1,
+    "MAX_FORCE": 0.2,
+    "VISUAL_RANGE": 80,
+    "BOID_SIZE": 8,
+    "PROTECTED_RANGE": 60,
+    "PREDATOR_SPEED": 4,
+    "HUNT_RANGE": 160
+  },
+  "colors": {
+    "BACKGROUND_COLOR": [30, 30, 40],
+    "BOID_COLOR": [100, 200, 255],
+    "BIASED_LEFT_COLOR": [175, 200, 255],
+    "BIASED_RIGHT_COLOR": [25, 200, 255],
+    "LEADER_COLOR": [255, 255, 0],
+    "PREDATOR_COLOR": [255, 0, 0],
+    "SLIDING_WINDOW_COLOR": [0, 0, 0, 10],
+    "SELECTION_COLOR": [0, 255, 0],
+    "HINT_COLOR": [200, 200, 200]
+  },
+  "fuzzy_settings": {
+    "MAX_FUZZY_DIST": 80,
+    "MAX_AVOID_FORCE": 0.5,
+    "MAX_EVASION_FORCE": 0.6
+  }
+}
