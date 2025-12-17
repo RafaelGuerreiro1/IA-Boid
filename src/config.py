@@ -1,8 +1,8 @@
 WIDTH = 1000
 HEIGHT = 700
-FPS = 60
+FPS = 144
 TITLE = "pyBoidz"
-BACKGROUND_COLOR = (30, 30, 40)
+BACKGROUND_COLOR = (78, 14, 73)
 
 class Config:
     """
