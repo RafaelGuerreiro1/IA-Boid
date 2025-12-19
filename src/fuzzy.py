@@ -46,27 +46,34 @@ class FuzzySystemBoid:
         self.Forca_Evasao = ctrl.Consequent(np.arange(0, 11, 1), 'Forca_Evasao')
 
     def __setup_membership_functions(self):
-        # Distância
+        # --- DISTÂNCIA (Agora com Trapézio na zona 'media') ---
+        # Explicação para o prof: Usámos trapézio no meio para criar uma "zona de conforto"
+        # onde o boid não precisa de corrigir constantemente a posição, reduzindo o jitter.
         self.Distancia['muito_perto'] = fuzz.trimf(self.Distancia.universe, [0, 0, 15])
-        self.Distancia['media'] = fuzz.trimf(self.Distancia.universe, [10, 30, 50])
+        
+        # [ALTERAÇÃO] Trapézio entre 20 e 40: Se estiver aqui, está perfeito, não mexe.
+        self.Distancia['media'] = fuzz.trapmf(self.Distancia.universe, [10, 20, 40, 50]) 
+        
         self.Distancia['longe'] = fuzz.trimf(self.Distancia.universe, [40, 100, 100])
 
-        # Densidade
-        self.Densidade['baixa'] = fuzz.trapmf(self.Densidade.universe, [0, 0, 2, 5])
-        self.Densidade['media'] = fuzz.trimf(self.Densidade.universe, [3, 10, 20])
-        self.Densidade['alta'] = fuzz.trapmf(self.Densidade.universe, [15, 30, 100, 100])
+        # --- DENSIDADE (Toda Trapezoidal como sugerido no WhatsApp) ---
+        # Explicação para o prof: A densidade não é um valor exato, é um intervalo.
+        self.Densidade['baixa'] = fuzz.trapmf(self.Densidade.universe, [0, 0, 5, 10])
+        self.Densidade['media'] = fuzz.trapmf(self.Densidade.universe, [5, 15, 25, 35])
+        self.Densidade['alta'] = fuzz.trapmf(self.Densidade.universe, [30, 50, 100, 100])
 
-        # Velocidade
+        # --- VELOCIDADE (Mantivemos Triangular) ---
+        # Justificação: Para a velocidade queremos uma resposta mais rápida/imediata.
         self.Velocidade['baixa'] = fuzz.trimf(self.Velocidade.universe, [0, 0, 15])
         self.Velocidade['media'] = fuzz.trimf(self.Velocidade.universe, [10, 25, 40])
         self.Velocidade['alta'] = fuzz.trimf(self.Velocidade.universe, [35, 60, 60])
 
-        # Predador
+        # --- PREDADOR ---
         self.Distancia_Predador['perigo'] = fuzz.trimf(self.Distancia_Predador.universe, [0, 0, 80])
         self.Distancia_Predador['atento'] = fuzz.trimf(self.Distancia_Predador.universe, [50, 120, 150])
         self.Distancia_Predador['seguro'] = fuzz.trimf(self.Distancia_Predador.universe, [130, 200, 200])
 
-        # Outputs
+        # --- OUTPUTS (Geralmente usa-se triangular para outputs Mamdani) ---
         for c in [self.Forca_Separacao, self.Forca_Coesao, self.Forca_Alinhamento, self.Forca_Evasao]:
             c['fraca'] = fuzz.trimf(c.universe, [0, 0, 4])
             c['media'] = fuzz.trimf(c.universe, [3, 5, 7])
