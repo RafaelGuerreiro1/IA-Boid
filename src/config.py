@@ -23,4 +23,3 @@ class Config:
                 setattr(self, key, Config(value))
             else:
                 # If it's a final value, set it as an attribute
-                setattr(self, key, value)
