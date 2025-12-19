@@ -72,13 +72,29 @@ class FuzzySystemBoid:
         self.boidz_controller = ctrl.ControlSystem(self.rules)
         self.boidz_sys = ctrl.ControlSystemSimulation(self.boidz_controller)
 
-    def calculate_fuzzy(self, current_entity, boids: list, predators =None):
+    # -------------------------------------------------------------------------
+    # CORREÇÃO 1: Adicionámos predators=None para não crashar com o motor
+    # CORREÇÃO 2: Movemos o teletransporte (screen wrap) para aqui dentro
+    # -------------------------------------------------------------------------
+    def calculate_fuzzy(self, current_entity, boids: list, predators=None):
         self.last_entity = current_entity
         self.last_boids = boids if boids else []
+        
+        # --- HACK DE TELETRANSPORTE (Permitido pois altera o estado do boid atual) ---
+        # Como não podemos mexer no engine, garantimos que eles não fogem aqui.
+        try:
+            w, h = pygame.display.get_surface().get_size()
+            if current_entity.position.x > w: current_entity.position.x = 0
+            elif current_entity.position.x < 0: current_entity.position.x = w
+            if current_entity.position.y > h: current_entity.position.y = 0
+            elif current_entity.position.y < 0: current_entity.position.y = h
+        except:
+            pass # Previne erro se o display ainda não estiver iniciado
+        # -----------------------------------------------------------------------------
 
         neighbors = [b for b in self.last_boids if b is not current_entity and current_entity.position.distance_to(b.position) < self.perception_radius]
 
-        avg_dist = 60 # Valor 'longe' por defeito
+        avg_dist = 60 
         density = 0
         avg_speed_diff = 0.0
 
@@ -89,7 +105,6 @@ class FuzzySystemBoid:
             speed_diffs = [abs(current_entity.velocity.length() - b.velocity.length()) for b in neighbors]
             avg_speed_diff = float(np.mean(speed_diffs))
 
-        # Clipping rigoroso para evitar erros de limites do skfuzzy
         self.boidz_sys.input['Distancia'] = np.clip(avg_dist, 0, 60)
         self.boidz_sys.input['Densidade'] = np.clip(density, 0, 100)
         self.boidz_sys.input['Velocidade'] = np.clip(avg_speed_diff, 0, 60)
@@ -97,7 +112,6 @@ class FuzzySystemBoid:
         try:
             self.boidz_sys.compute()
         except Exception as e:
-            # Em vez de fechar, avisa no terminal
             print(f"Erro no calculo Fuzzy Boid: {e}")
 
     def compute(self):
@@ -105,7 +119,6 @@ class FuzzySystemBoid:
             return pygame.Vector2(0, 0)
 
         try:
-            # Garante que existem valores antes de ler
             sep = self.boidz_sys.output.get('Forca_Separacao', 0)
             coh = self.boidz_sys.output.get('Forca_Coesao', 0)
             ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
@@ -118,7 +131,9 @@ class FuzzySystemBoid:
         except:
             return pygame.Vector2(0,0)
 
-    # Funções de vetores (corrigido erro de divisão por zero no count)
+    # -------------------------------------------------------------------------
+    # CORREÇÃO 3: Vetor de Separação corrigido (sem divisão por distância)
+    # -------------------------------------------------------------------------
     def _separation_vector(self, entity, boids):
         steer = pygame.Vector2(0, 0)
         count = 0
@@ -127,8 +142,7 @@ class FuzzySystemBoid:
             d = entity.position.distance_to(b.position)
             if 0 < d < self.perception_radius:
                 diff = (entity.position - b.position)
-                diff.normalize_ip()
-                diff /= d
+                diff.normalize_ip() # Apenas direção! A magnitude vem do Fuzzy (sep).
                 steer += diff
                 count += 1
         return steer / count if count > 0 else steer
@@ -163,14 +177,14 @@ class FuzzySystemBoid:
         return pygame.Vector2(0, 0)
 
     def show_fuzzy_graphs(self):
-        """Atenção: Use isto apenas para debug e fora do loop de 60fps"""
         if not self.enable_graphics:
             return
-        # Para ver gráficos sem crashar, mude o backend no topo para 'TkAgg'
-        # Mas isto vai abrandar imenso a simulação.
         self.Distancia.view(sim=self.boidz_sys)
         plt.show()
 
+    # -------------------------------------------------------------------------
+    # CORREÇÃO 4: Métodos obrigatórios para a GUI (tinham sido removidos)
+    # -------------------------------------------------------------------------
     def get_system(self): 
         return self.boidz_sys
 
@@ -196,43 +210,39 @@ class FuzzySystemPredator:
         self.__setup_inference_system()
 
     def __setup_variables(self):
-        # Entradas (antecedentes)
+        # Entradas
         self.distancia = ctrl.Antecedent(np.arange(0, 502, 1), 'distancia')
-        self.distancia_ang = ctrl.Antecedent(np.arange(0, 181, 1), 'distancia_ang')
+        self.alinhamento = ctrl.Antecedent(np.arange(-180, 182, 1), 'alinhamento')
 
-        # Saídas (consequentes)
+        # Saídas
         self.magnitude = ctrl.Consequent(np.arange(0, 11, 0.1), 'magnitude')
-        self.forca_evasao = ctrl.Consequent(np.arange(0, 11, 1), 'forca_evasao')
+        self.correcao_direcao = ctrl.Consequent(np.arange(-90, 92, 1), 'correcao_direcao')
 
     def __setup_membership_functions(self):
-        # Distância linear até à presa
+        # Distância
         self.distancia['muito_perto'] = fuzz.trimf(self.distancia.universe, [0, 0, 100])
         self.distancia['longe'] = fuzz.trimf(self.distancia.universe, [80, 500, 501])
 
-        # Distância angular da presa (posição relativa)
-        self.distancia_ang['frontal'] = fuzz.trimf(self.distancia_ang.universe, [0, 0, 50])
-        self.distancia_ang['lateral'] = fuzz.trimf(self.distancia_ang.universe, [50, 85, 120])
-        self.distancia_ang['traseiro'] = fuzz.trimf(self.distancia_ang.universe, [120, 150, 180])
+        # Alinhamento
+        self.alinhamento['esquerda'] = fuzz.trimf(self.alinhamento.universe, [-180, -90, 0])
+        self.alinhamento['centro'] = fuzz.trimf(self.alinhamento.universe, [-20, 0, 20])
+        self.alinhamento['direita'] = fuzz.trimf(self.alinhamento.universe, [0, 90, 180])
 
-        # Magnitude (velocidade)
+        # Saídas
         self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 2, 5])
         self.magnitude['rapida'] = fuzz.trimf(self.magnitude.universe, [4, 10, 10])
 
-        # Força de evasão (ajuste angular do movimento)
-        self.forca_evasao['fraca'] = fuzz.trimf(self.forca_evasao.universe, [0, 0, 4])
-        self.forca_evasao['media'] = fuzz.trimf(self.forca_evasao.universe, [3, 5, 7])
-        self.forca_evasao['forte'] = fuzz.trimf(self.forca_evasao.universe, [6, 10, 10])
+        self.correcao_direcao['forte_esq'] = fuzz.trimf(self.correcao_direcao.universe, [-90, -90, -30])
+        self.correcao_direcao['nenhuma'] = fuzz.trimf(self.correcao_direcao.universe, [-15, 0, 15])
+        self.correcao_direcao['forte_dir'] = fuzz.trimf(self.correcao_direcao.universe, [30, 90, 90])
 
     def __setup_rules(self):
         self.rules = [
-            # Regras de velocidade
             ctrl.Rule(self.distancia['muito_perto'], self.magnitude['rapida']),
             ctrl.Rule(self.distancia['longe'], self.magnitude['lenta']),
-
-            # Regras de ângulo
-            ctrl.Rule(self.distancia_ang['frontal'], self.forca_evasao['fraca']),
-            ctrl.Rule(self.distancia_ang['lateral'], self.forca_evasao['media']),
-            ctrl.Rule(self.distancia_ang['traseiro'], self.forca_evasao['forte']),
+            ctrl.Rule(self.alinhamento['esquerda'], self.correcao_direcao['forte_esq']),
+            ctrl.Rule(self.alinhamento['centro'], self.correcao_direcao['nenhuma']),
+            ctrl.Rule(self.alinhamento['direita'], self.correcao_direcao['forte_dir']),
         ]
 
     def __setup_inference_system(self):
@@ -241,49 +251,69 @@ class FuzzySystemPredator:
 
     def calculate_fuzzy(self, current_entity, boids: list):
         self.last_entity = current_entity
-        self.last_boids = boids
-        if not boids:
+        self.last_boids = boids if boids else []
+
+        # --- HACK DE TELETRANSPORTE DO PREDADOR ---
+        # Mantém o predador dentro do ecrã para ele não perder os boids
+        try:
+            w, h = pygame.display.get_surface().get_size()
+            if current_entity.position.x > w: current_entity.position.x = 0
+            elif current_entity.position.x < 0: current_entity.position.x = w
+            if current_entity.position.y > h: current_entity.position.y = 0
+            elif current_entity.position.y < 0: current_entity.position.y = h
+        except:
+            pass
+        # ------------------------------------------
+
+        if not self.last_boids:
             return
 
-        closest = min(boids, key=lambda b: current_entity.position.distance_to(b.position))
+        closest = min(self.last_boids, key=lambda b: current_entity.position.distance_to(b.position))
         dist = current_entity.position.distance_to(closest.position)
 
-        # Direção da presa
         dir_to_prey = closest.position - current_entity.position
         if dir_to_prey.length() == 0:
-            dist_ang = 0
+            angle_diff = 0
         else:
             target_angle = math.degrees(math.atan2(dir_to_prey.y, dir_to_prey.x))
             current_angle = math.degrees(current_entity.angle)
-            dist_ang = abs((target_angle - current_angle + 180) % 360 - 180)
+            angle_diff = (target_angle - current_angle + 180) % 360 - 180
 
-        # Atribuir entradas fuzzy
         self.boidz_sys.input['distancia'] = np.clip(dist, 0, 501)
-        self.boidz_sys.input['distancia_ang'] = np.clip(dist_ang, 0, 180)
+        self.boidz_sys.input['alinhamento'] = np.clip(angle_diff, -180, 181)
 
         try:
             self.boidz_sys.compute()
         except:
             pass
 
-    def compute(self, *args, **kwargs):
+    # AQUI ESTAVA O ERRO: Esta função tem de aceitar 'current_entity' explicitamente
+    def compute(self, current_entity=None):
+        # Atualiza a entidade se ela for passada pelo predator.py
+        if current_entity:
+            self.last_entity = current_entity
+            
         if self.last_entity is None:
             return pygame.Vector2(0, 0)
 
-        outputs = getattr(self.boidz_sys, 'output', {})
-        mag = outputs.get('magnitude', 3)
-        evasao = outputs.get('forca_evasao', 0)
+        try:
+            outputs = getattr(self.boidz_sys, 'output', {})
+            mag = outputs.get('magnitude', 3)
+            corr = outputs.get('correcao_direcao', 0)
 
-        # A força de evasão influencia o ângulo do movimento
-        new_angle = self.last_entity.angle + math.radians(evasao * 0.3)
-        desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
-        return desired_vel - self.last_entity.velocity
+            new_angle = self.last_entity.angle + math.radians(corr)
+            desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
+            
+            return desired_vel - self.last_entity.velocity
+        except:
+             return pygame.Vector2(0,0)
 
+    # Funções auxiliares para a GUI não crashar ao clicar no predador
     def get_system(self): 
         return self.boidz_sys
-
+    
     def get_output_variables(self): 
         return [c.label for c in self.boidz_controller.consequents]
-
+    
     def get_input_variables(self): 
         return [a.label for a in self.boidz_controller.antecedents]
