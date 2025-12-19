@@ -72,7 +72,7 @@ class FuzzySystemBoid:
         self.boidz_controller = ctrl.ControlSystem(self.rules)
         self.boidz_sys = ctrl.ControlSystemSimulation(self.boidz_controller)
 
-    def calculate_fuzzy(self, current_entity, boids: list):
+    def calculate_fuzzy(self, current_entity, boids: list, predators =None):
         self.last_entity = current_entity
         self.last_boids = boids if boids else []
 
@@ -170,6 +170,16 @@ class FuzzySystemBoid:
         # Mas isto vai abrandar imenso a simulação.
         self.Distancia.view(sim=self.boidz_sys)
         plt.show()
+
+    def get_system(self): 
+        return self.boidz_sys
+
+    def get_output_variables(self): 
+        return [c.label for c in self.boidz_controller.consequents]
+
+    def get_input_variables(self): 
+        return [a.label for a in self.boidz_controller.antecedents]
+
 
 
 
