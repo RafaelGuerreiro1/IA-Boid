@@ -1,33 +1,35 @@
-import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
+import numpy as np
 import pygame
 import math
-import warnings
 import matplotlib
 # Backend para não crashar ao gerar gráficos sem janela principal
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 
-warnings.filterwarnings("ignore")
+# =========================================
+#          THE FUZZY LOGIC ENGINE
+# =========================================
 
-# =======================================================================================
-# CLASSE DOS BOIDS (PRESAS)
-# =======================================================================================
 class FuzzySystemBoid:
     def __init__(self, config):
         self.config = config
         self.perception_radius = getattr(config, 'perception_radius', 50)
         self.max_speed = getattr(config, 'max_speed', 5)
-        
+
+        # Variáveis de estado
         self.last_entity = None
         self.last_boids = []
         self.last_predators = []
-        self.enable_graphics = False
 
+        # ==== Setup Variables ====
         self.__setup_variables()
+        # ==== Setup Membership Functions ====
         self.__setup_membership_functions()
+        # ==== Setup Rules ====
         self.__setup_rules()
+        # ==== Setup Inference System ====
         self.__setup_inference_system()
 
     def __setup_variables(self):
@@ -71,33 +73,37 @@ class FuzzySystemBoid:
             c['forte'] = fuzz.trimf(c.universe, [6, 10, 10])
 
     def __setup_rules(self):
-        self.rules = [
-            # Regras de Distância (Socialização)
-            ctrl.Rule(self.Distancia['media'], (self.Forca_Separacao['media'], self.Forca_Coesao['media'], self.Forca_Alinhamento['forte'])),
-            ctrl.Rule(self.Distancia['muito_perto'], (self.Forca_Separacao['forte'], self.Forca_Coesao['fraca'], self.Forca_Alinhamento['media'])),
-            ctrl.Rule(self.Distancia['longe'], (self.Forca_Separacao['fraca'], self.Forca_Coesao['forte'])),
+        # Regras de Distância (Socialização)
+        r1 = ctrl.Rule(self.Distancia['media'], (self.Forca_Separacao['media'], self.Forca_Coesao['media'], self.Forca_Alinhamento['forte']))
+        r2 = ctrl.Rule(self.Distancia['muito_perto'], (self.Forca_Separacao['forte'], self.Forca_Coesao['fraca'], self.Forca_Alinhamento['media']))
+        r3 = ctrl.Rule(self.Distancia['longe'], (self.Forca_Separacao['fraca'], self.Forca_Coesao['forte']))
 
-            # Regra para usar a Densidade (evita o erro ValueError)
-            ctrl.Rule(self.Densidade['alta'], self.Forca_Separacao['media']),
+        # Regra para usar a Densidade (evita o erro ValueError)
+        r4 = ctrl.Rule(self.Densidade['alta'], self.Forca_Separacao['media'])
 
-            # Velocidade
-            ctrl.Rule(self.Velocidade['alta'], self.Forca_Alinhamento['forte']),
+        # Velocidade
+        r5 = ctrl.Rule(self.Velocidade['alta'], self.Forca_Alinhamento['forte'])
 
-            # Predador
-            ctrl.Rule(self.Distancia_Predador['perigo'], (self.Forca_Evasao['forte'], self.Forca_Separacao['forte'], self.Forca_Alinhamento['fraca'])),
-            ctrl.Rule(self.Distancia_Predador['atento'], self.Forca_Evasao['media']),
-        ]
+        # Predador
+        r6 = ctrl.Rule(self.Distancia_Predador['perigo'], (self.Forca_Evasao['forte'], self.Forca_Separacao['forte'], self.Forca_Alinhamento['fraca']))
+        r7 = ctrl.Rule(self.Distancia_Predador['atento'], self.Forca_Evasao['media'])
+
+        self.rules = [r1, r2, r3, r4, r5, r6, r7]
 
     def __setup_inference_system(self):
+        # ==== Inference System ====
         self.boidz_controller = ctrl.ControlSystem(self.rules)
         self.boidz_sys = ctrl.ControlSystemSimulation(self.boidz_controller)
 
-    def calculate_fuzzy(self, current_entity, boids: list, predators=None):
+    def get_system(self):
+        return self.boidz_sys
+
+    def calculate_fuzzy(self, current_entity, boids: list, predators: list):
         self.last_entity = current_entity
         self.last_boids = boids if boids else []
         self.last_predators = predators if predators else []
-        
-        # Screen Wrap (Teletransporte)
+
+        # --- Screen Wrap Hack ---
         try:
             w, h = pygame.display.get_surface().get_size()
             if current_entity.position.x > w: current_entity.position.x = 0
@@ -106,6 +112,7 @@ class FuzzySystemBoid:
             elif current_entity.position.y < 0: current_entity.position.y = h
         except:
             pass
+        # ------------------------
 
         neighbors = [b for b in self.last_boids if b is not current_entity and current_entity.position.distance_to(b.position) < self.perception_radius]
 
@@ -125,7 +132,6 @@ class FuzzySystemBoid:
             closest_pred = min(self.last_predators, key=lambda p: current_entity.position.distance_to(p.position))
             pred_dist = current_entity.position.distance_to(closest_pred.position)
 
-        # Inputs
         self.boidz_sys.input['Distancia'] = np.clip(avg_dist, 0, 100)
         self.boidz_sys.input['Densidade'] = np.clip(density, 0, 100)
         self.boidz_sys.input['Velocidade'] = np.clip(avg_speed_diff, 0, 60)
@@ -137,15 +143,15 @@ class FuzzySystemBoid:
             pass
 
     def compute(self):
-        if self.last_entity is None: return pygame.Vector2(0, 0)
-
+        if self.last_entity is None:
+            return pygame.Vector2(0, 0)
+        
         try:
             sep = self.boidz_sys.output.get('Forca_Separacao', 0)
             coh = self.boidz_sys.output.get('Forca_Coesao', 0)
             ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
             eva = self.boidz_sys.output.get('Forca_Evasao', 0)
 
-            # Vetores com multiplicadores afinados
             v_sep = self._separation_vector(self.last_entity, self.last_boids) * sep * 1.2
             v_coh = self._cohesion_vector(self.last_entity, self.last_boids) * coh
             v_ali = self._alignment_vector(self.last_entity, self.last_boids) * ali * 2.0
@@ -153,9 +159,9 @@ class FuzzySystemBoid:
 
             return v_sep + v_coh + v_ali + v_eva
         except:
-            return pygame.Vector2(0,0)
+            return pygame.Vector2(0, 0)
 
-    # --- VETORES ---
+    # Métodos auxiliares de vetores
     def _separation_vector(self, entity, boids):
         steer = pygame.Vector2(0, 0)
         count = 0
@@ -164,7 +170,7 @@ class FuzzySystemBoid:
             d = entity.position.distance_to(b.position)
             if 0 < d < self.perception_radius:
                 diff = (entity.position - b.position)
-                diff.normalize_ip() 
+                diff.normalize_ip()
                 steer += diff
                 count += 1
         return steer / count if count > 0 else steer
@@ -206,38 +212,39 @@ class FuzzySystemBoid:
             if diff.length() > 0: steer = diff.normalize()
         return steer
 
-    # --- GUI ---
-    def show_fuzzy_graphs(self):
-        if not self.enable_graphics: return
-        self.Distancia.view(sim=self.boidz_sys)
-        plt.show()
+    def get_output_variables(self) -> list[str]:
+        if not hasattr(self, 'boidz_controller'): return []
+        return [consequent.label for consequent in self.boidz_controller.consequents]
 
-    def get_system(self): return self.boidz_sys
-    def get_output_variables(self): return [c.label for c in self.boidz_controller.consequents]
-    def get_input_variables(self): return [a.label for a in self.boidz_controller.antecedents]
+    def get_input_variables(self) -> list[str]:
+        if not hasattr(self, 'boidz_controller'): return []
+        return [antecedent.label for antecedent in self.boidz_controller.antecedents]
 
+# =========================================
+#          PREDATOR LOGIC
+# =========================================
 
-# =======================================================================================
-# CLASSE DOS PREDADORES
-# =======================================================================================
 class FuzzySystemPredator:
     def __init__(self, config):
         self.config = config
-        # AUMENTÁMOS A VELOCIDADE MÁXIMA AQUI PARA 15
-        self.max_speed = getattr(config, 'max_speed', 15)
+        self.max_speed = getattr(config, 'max_speed', 15) # Velocidade rápida
         self.last_entity = None
         self.last_boids = []
 
+        # ==== Setup Variables ====
         self.__setup_variables()
+        # ==== Setup Membership Functions ====
         self.__setup_membership_functions()
+        # ==== Setup Rules ====
         self.__setup_rules()
+        # ==== Setup Inference System ====
         self.__setup_inference_system()
 
     def __setup_variables(self):
         self.distancia = ctrl.Antecedent(np.arange(0, 502, 1), 'distancia')
         self.alinhamento = ctrl.Antecedent(np.arange(-180, 182, 1), 'alinhamento')
         
-        # AUMENTÁMOS O UNIVERSO PARA 16 (0 a 15)
+        # Universo estendido para velocidade (até 16)
         self.magnitude = ctrl.Consequent(np.arange(0, 16, 0.1), 'magnitude')
         self.correcao_direcao = ctrl.Consequent(np.arange(-90, 92, 1), 'correcao_direcao')
 
@@ -249,7 +256,6 @@ class FuzzySystemPredator:
         self.alinhamento['centro'] = fuzz.trimf(self.alinhamento.universe, [-20, 0, 20])
         self.alinhamento['direita'] = fuzz.trimf(self.alinhamento.universe, [0, 90, 180])
 
-        # AJUSTÁMOS AS FUNÇÕES PARA A NOVA VELOCIDADE
         self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 2, 8])
         self.magnitude['rapida'] = fuzz.trimf(self.magnitude.universe, [5, 15, 15])
 
@@ -267,13 +273,18 @@ class FuzzySystemPredator:
         ]
 
     def __setup_inference_system(self):
+        # ==== Inference System ====
         self.boidz_controller = ctrl.ControlSystem(self.rules)
         self.boidz_sys = ctrl.ControlSystemSimulation(self.boidz_controller)
+
+    def get_system(self):
+        return self.boidz_sys
 
     def calculate_fuzzy(self, current_entity, boids: list):
         self.last_entity = current_entity
         self.last_boids = boids if boids else []
 
+        # --- Screen Wrap Hack (Predator) ---
         try:
             w, h = pygame.display.get_surface().get_size()
             if current_entity.position.x > w: current_entity.position.x = 0
@@ -282,6 +293,7 @@ class FuzzySystemPredator:
             elif current_entity.position.y < 0: current_entity.position.y = h
         except:
             pass
+        # -----------------------------------
 
         if not self.last_boids: return
 
@@ -318,8 +330,12 @@ class FuzzySystemPredator:
             
             return desired_vel - self.last_entity.velocity
         except:
-             return pygame.Vector2(0,0)
+            return pygame.Vector2(0, 0)
 
-    def get_system(self): return self.boidz_sys
-    def get_output_variables(self): return [c.label for c in self.boidz_controller.consequents]
-    def get_input_variables(self): return [a.label for a in self.boidz_controller.antecedents]
+    def get_output_variables(self) -> list[str]:
+        if not hasattr(self, 'boidz_controller'): return []
+        return [consequent.label for consequent in self.boidz_controller.consequents]
+
+    def get_input_variables(self) -> list[str]:
+        if not hasattr(self, 'boidz_controller'): return []
+        return [antecedent.label for antecedent in self.boidz_controller.antecedents]
