@@ -9,7 +9,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # =========================================
-#          THE FUZZY LOGIC ENGINE
+#        Zebras
 # =========================================
 
 class FuzzySystemBoid:
@@ -40,7 +40,7 @@ class FuzzySystemBoid:
         self.Densidade = ctrl.Antecedent(np.arange(0, 101, 1), 'Densidade')
         self.Velocidade = ctrl.Antecedent(np.arange(0, 61, 1), 'Velocidade')
         # Variável extra para detetar o predador
-        self.Distancia_Predador = ctrl.Antecedent(np.arange(0, 201, 1), 'Distancia_Predador')
+        self.Distancia_Hiena = ctrl.Antecedent(np.arange(0, 201, 1), 'Distancia_Hiena')
 
         # Consequentes (Saídas) - As forças que vamos aplicar no boid
         self.Forca_Separacao = ctrl.Consequent(np.arange(0, 11, 1), 'Forca_Separacao')
@@ -71,9 +71,9 @@ class FuzzySystemBoid:
         self.Velocidade['alta'] = fuzz.trimf(self.Velocidade.universe, [35, 60, 60])
 
         # --- PREDADOR ---
-        self.Distancia_Predador['perigo'] = fuzz.trimf(self.Distancia_Predador.universe, [0, 0, 80])
-        self.Distancia_Predador['atento'] = fuzz.trimf(self.Distancia_Predador.universe, [50, 120, 150])
-        self.Distancia_Predador['seguro'] = fuzz.trimf(self.Distancia_Predador.universe, [130, 200, 200])
+        self.Distancia_Hiena['perigo'] = fuzz.trimf(self.Distancia_Hiena.universe, [0, 0, 80])
+        self.Distancia_Hiena['atento'] = fuzz.trimf(self.Distancia_Hiena.universe, [50, 120, 150])
+        self.Distancia_Hiena['seguro'] = fuzz.trimf(self.Distancia_Hiena.universe, [130, 200, 200])
 
         # --- OUTPUTS ---
         # Outputs usamos sempre triangular para a decisão ser mais precisa
@@ -95,8 +95,8 @@ class FuzzySystemBoid:
         r5 = ctrl.Rule(self.Velocidade['alta'], self.Forca_Alinhamento['forte'])
 
         # Regras de PREDADOR (Prioridade máxima: FUGIR)
-        r6 = ctrl.Rule(self.Distancia_Predador['perigo'], (self.Forca_Evasao['forte'], self.Forca_Separacao['forte'], self.Forca_Alinhamento['fraca']))
-        r7 = ctrl.Rule(self.Distancia_Predador['atento'], self.Forca_Evasao['media'])
+        r6 = ctrl.Rule(self.Distancia_Hiena['perigo'], (self.Forca_Evasao['forte'], self.Forca_Separacao['forte'], self.Forca_Alinhamento['fraca']))
+        r7 = ctrl.Rule(self.Distancia_Hiena['atento'], self.Forca_Evasao['media'])
 
         self.rules = [r1, r2, r3, r4, r5, r6, r7]
 
@@ -148,7 +148,7 @@ class FuzzySystemBoid:
         self.boidz_sys.input['Distancia'] = np.clip(avg_dist, 0, 100)
         self.boidz_sys.input['Densidade'] = np.clip(density, 0, 100)
         self.boidz_sys.input['Velocidade'] = np.clip(avg_speed_diff, 0, 60)
-        self.boidz_sys.input['Distancia_Predador'] = np.clip(pred_dist, 0, 200)
+        self.boidz_sys.input['Distancia_Hiena'] = np.clip(pred_dist, 0, 200)
 
         # print(f"Dist: {avg_dist}, Dens: {density}") # Debug
 
@@ -239,7 +239,7 @@ class FuzzySystemBoid:
         return [antecedent.label for antecedent in self.boidz_controller.antecedents]
 
 # =========================================
-#          PREDATOR LOGIC
+#          Hiena 
 # =========================================
 
 class FuzzySystemPredator:
