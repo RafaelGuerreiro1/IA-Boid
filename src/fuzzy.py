@@ -305,6 +305,7 @@ class FuzzySystemPredator:
         self.alinhamento['direita'] = fuzz.trimf(self.alinhamento.universe, [10, 90, 180])
 
         self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 2, 8])
+        self.magnitude['rapida'] = fuzz.trapmf(self.magnitude.universe, [3, 6, self.max_speed, self.max_speed])
 
         self.correcao_direcao['forte_esq'] = fuzz.trimf(self.correcao_direcao.universe, [-90, -90, -30])
         self.correcao_direcao['nenhuma'] = fuzz.trimf(self.correcao_direcao.universe, [-15, 0, 15])
