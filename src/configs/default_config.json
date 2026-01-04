@@ -17,11 +17,11 @@
     "NUM_PREDATORS": 1,
     "MAX_SPEED": 7,
     "MIN_SPEED": 1,
-    "MAX_FORCE": 0.2,
+    "MAX_FORCE": 10,
     "VISUAL_RANGE": 80,
     "BOID_SIZE": 8,
     "PROTECTED_RANGE": 60,
-    "PREDATOR_SPEED": 4,
+    "PREDATOR_SPEED": 8,
     "HUNT_RANGE": 160
   },
   "colors": {

@@ -276,7 +276,8 @@ class FuzzySystemBoid:
 class FuzzySystemPredator:
     def __init__(self, config):
         self.config = config  
-        self.max_speed = getattr(getattr(config, 'boids', None), 'MAX_SPEED', 5)   
+        self.max_pred_speed = getattr(getattr(config, 'boids', None), 'PREDATOR_SPEED', 20)  
+        print(self.max_pred_speed)
 
         # ==== Setup Variables ====
         self.__setup_variables()
@@ -291,12 +292,12 @@ class FuzzySystemPredator:
         self.distancia = ctrl.Antecedent(np.arange(0, 501, 1), 'distancia')
         self.alinhamento = ctrl.Antecedent(np.arange(-180, 181, 1), 'alinhamento') # assim faz 360
         
-        self.magnitude = ctrl.Consequent(np.arange(0, self.max_speed+1, 0.1), 'magnitude')
+        self.magnitude = ctrl.Consequent(np.arange(0, self.max_pred_speed + 1, 0.1), 'magnitude')
         self.correcao_direcao = ctrl.Consequent(np.arange(-90, 92, 1), 'correcao_direcao')
 
     def __setup_membership_functions(self):
-        self.distancia['muito_perto'] = fuzz.trimf(self.distancia.universe, [0, 0, 100])
-        self.distancia['longe'] = fuzz.trapmf(self.distancia.universe, [80, 200, 500, 500])
+        self.distancia['muito_perto'] = fuzz.trapmf(self.distancia.universe, [0, 0, 250, 400])
+        self.distancia['longe'] = fuzz.trapmf(self.distancia.universe, [300, 450, 500, 500])
 
         # Alinhamento
         self.alinhamento['esquerda'] = fuzz.trimf(self.alinhamento.universe, [-180, -90, -10])
@@ -304,8 +305,9 @@ class FuzzySystemPredator:
         self.alinhamento['centro'] = fuzz.trimf(self.alinhamento.universe, [-40, 0, 40])
         self.alinhamento['direita'] = fuzz.trimf(self.alinhamento.universe, [10, 90, 180])
 
-        self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 2, 8])
-        self.magnitude['rapida'] = fuzz.trapmf(self.magnitude.universe, [3, 6, self.max_speed, self.max_speed])
+        self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 0, 2])
+        ms = self.max_pred_speed
+        self.magnitude['rapida'] = fuzz.trapmf(self.magnitude.universe, [ms*0.4, ms*0.8, ms, ms])
 
         self.correcao_direcao['forte_esq'] = fuzz.trimf(self.correcao_direcao.universe, [-90, -90, -30])
         self.correcao_direcao['nenhuma'] = fuzz.trimf(self.correcao_direcao.universe, [-15, 0, 15])
