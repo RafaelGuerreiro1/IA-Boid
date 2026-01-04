@@ -11,15 +11,17 @@ import math
 class FuzzySystemBoid:
     def __init__(self, config):
         self.config = config
-        # Carregar configurações ou usar valores base
         self.perception_radius = getattr(config, 'perception_radius', 50)
-
         self.max_speed_config = getattr(getattr(config, 'boids', None), 'MAX_SPEED', 5)
 
-        # Variáveis de estado para guardar o que o boid vê
-        self.last_entity = None # n existe nenhum last quando criamos o objeto
-        self.last_boids = [] #estado das zebras
-        self.last_predators = [] # estado das hienas
+        # guardar o vetor de força calculado para entregar no compute
+        self.cached_vector = pygame.Vector2(0, 0)
+
+        # Peso das forças
+        self.weight_separation = 1.2
+        self.weight_cohesion = 1.0
+        self.weight_alignment = 2.0
+        self.weight_evasion = 2.5
 
         # ==== Setup Variables ====
         self.__setup_variables()
@@ -109,9 +111,12 @@ class FuzzySystemBoid:
         return self.boidz_sys
 
     def calculate_fuzzy(self, current_entity, boids: list, predators: list):
-        self.last_entity = current_entity # guarda a zebra atual
-        self.last_boids = boids if boids else [] # faz com que a lista nunca seja none para n dar erro
-        self.last_predators = predators if predators else [] #idem, esta linha so é necessária faace à distancia do predadpr?
+        # 1. Proteção contra listas vazias
+        boids_list = boids if boids else []
+        predators_list = predators if predators else []
+
+        
+        
 
         # --- Screen Wrap (Teletransporte) ---
         # Tivemos de implementar isto aqui porque senao os boids fugiam do ecra
@@ -120,12 +125,14 @@ class FuzzySystemBoid:
         elif current_entity.position.x < 0: current_entity.position.x = w # movimento horizontal
         if current_entity.position.y > h: current_entity.position.y = 0
         elif current_entity.position.y < 0: current_entity.position.y = h
-        
+
         # ------------------------------------
         # dentro desta lista vão ficar todos as zebras vizinhas
-        #  incluindo apenas aquelas que estão dentro do seu raio de percepção, face à zebra atual.
+        # incluindo apenas aquelas que estão dentro do seu raio de percepção, face à zebra atual.
         # z= zebra
-        neighbors = [z for z in self.last_boids if z is not current_entity and current_entity.position.distance_to(z.position) < self.perception_radius]
+        neighbors = [z for z in boids_list if z is not current_entity and current_entity.position.distance_to(z.position) < self.perception_radius]
+        
+        
 
         avg_dist = 100 # Default longe
         density = 0
@@ -140,8 +147,8 @@ class FuzzySystemBoid:
 
         # Calcular distancia ao predador
         pred_dist = 200 # Default seguro
-        if self.last_predators:
-            closest_pred = min(self.last_predators, key=lambda p: current_entity.position.distance_to(p.position))
+        if predators_list:
+            closest_pred = min(predators_list, key=lambda p: current_entity.position.distance_to(p.position))
             pred_dist = current_entity.position.distance_to(closest_pred.position)
 
         # Atualizar inputs (com clip para garantir que nao sai do universo)
@@ -152,28 +159,31 @@ class FuzzySystemBoid:
 
         # print(f"Dist: {avg_dist}, Dens: {density}") # Debug
 
-        self.boidz_sys.compute()
+        
+        try:
+            self.boidz_sys.compute()
+            # Ler outputs do sistema Fuzzy
+            sep = self.boidz_sys.output.get('Forca_Separacao', 0)
+            coh = self.boidz_sys.output.get('Forca_Coesao', 0)
+            ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
+            eva = self.boidz_sys.output.get('Forca_Evasao', 0)
+        except:
+            # Se der erro no fuzzy, assumimos zeros
+            sep, coh, ali, eva = 0, 0, 0, 0
+
+
+        #Estes vetores são multiplicados pelo valor fuzzy/peso correspondente 
+        # ajustando intensidade da força.
+        v_sep = self._separation_vector(current_entity, boids_list) * sep * self.weight_separation
+        v_coh = self._cohesion_vector(current_entity, boids_list) * coh * self.weight_cohesion
+        v_ali = self._alignment_vector(current_entity, boids_list) * ali * self.weight_alignment
+        v_eva = self._evasion_vector(current_entity, predators_list) * eva * self.weight_evasion
+
+        self.cached_vector = v_sep + v_coh + v_ali + v_eva
         
 
-    def compute(self):
-        if self.last_entity is None:
-            return pygame.Vector2(0, 0)
-        
-        # Ler outputs do sistema Fuzzy
-        sep = self.boidz_sys.output.get('Forca_Separacao', 0)
-        coh = self.boidz_sys.output.get('Forca_Coesao', 0)
-        ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
-        eva = self.boidz_sys.output.get('Forca_Evasao', 0)
-
-            # Aplicar multiplicadores para afinar o comportamento
-        v_sep = self._separation_vector(self.last_entity, self.last_boids) * sep * 1.2
-        v_coh = self._cohesion_vector(self.last_entity, self.last_boids) * coh
-        v_ali = self._alignment_vector(self.last_entity, self.last_boids) * ali * 2.0
-        v_eva = self._evasion_vector(self.last_entity, self.last_predators) * eva * 2.5
-            #Estes vetores são multiplicados pelo valor fuzzy correspondente 
-            # ajustando intensidade da força.
-
-        return v_sep + v_coh + v_ali + v_eva
+    def compute(self):     
+        return self.cached_vector
     
 
     # Métodos auxiliares de vetores
@@ -241,11 +251,7 @@ class FuzzySystemBoid:
 
 class FuzzySystemPredator:
     def __init__(self, config):
-        self.config = config
-        # Aumentei a velocidade para 15 para ele conseguir apanhar os boids## isto é suposto acontecer?
-        self.max_speed = getattr(config, 'max_speed', 15) 
-        self.last_entity = None
-        self.last_boids = []
+        self.config = config        
 
         # ==== Setup Variables ====
         self.__setup_variables()
@@ -301,8 +307,10 @@ class FuzzySystemPredator:
         return self.boidz_sys
 
     def calculate_fuzzy(self, current_entity, boids: list):
-        self.last_entity = current_entity
-        self.last_boids = boids if boids else []
+        boids_list = boids if boids else []
+
+        if not boids_list: 
+            return
 
         # --- Screen Wrap (Predator) ---
         w, h = pygame.display.get_surface().get_size()
@@ -312,23 +320,24 @@ class FuzzySystemPredator:
         elif current_entity.position.y < 0: current_entity.position.y = h
         
 
-        if not self.last_boids: return
+        
 
-        # Encontrar a presa mais proxima
-        closest = min(self.last_boids, key=lambda b: current_entity.position.distance_to(b.position))
+        #1 Encontrar a presa mais proxima
+        closest = min(boids_list, key=lambda b: current_entity.position.distance_to(b.position))
         dist = current_entity.position.distance_to(closest.position)
 
-        # Calcular o angulo para a presa
+        #2 Calcular o angulo para a presa
         dir_to_prey = closest.position - current_entity.position
-        if dir_to_prey.length() == 0:
-            angle_diff = 0
-        else:
+
+        angle_diff = 0
+        if dir_to_prey.length() > 0:            
             target_angle = math.degrees(math.atan2(dir_to_prey.y, dir_to_prey.x))
             current_angle = math.degrees(current_entity.angle)
-            angle_diff = (target_angle - current_angle + 180) % 360 - 180
+            angle_diff = (target_angle - current_angle + 180) % 360 - 180 #feito para ir de -180 a 180
 
-        self.boidz_sys.input['distancia'] = np.clip(dist, 0, 501)
-        self.boidz_sys.input['alinhamento'] = np.clip(angle_diff, -180, 181)
+        #3 Inserir no fuzzy
+        self.boidz_sys.input['distancia'] = np.clip(dist, 0, 500)
+        self.boidz_sys.input['alinhamento'] = np.clip(angle_diff, -180, 180)
 
         self.boidz_sys.compute()
         
@@ -343,10 +352,10 @@ class FuzzySystemPredator:
         corr = outputs.get('correcao_direcao', 0)
 
             # Aplicar a rotação e velocidade
-        new_angle = self.last_entity.angle + math.radians(corr)
+        new_angle = current_entity.angle + math.radians(corr)
         desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
             
-        return desired_vel - self.last_entity.velocity
+        return desired_vel - current_entity.velocity
 
     def get_output_variables(self) -> list[str]:
         if not hasattr(self, 'boidz_controller'): return []
