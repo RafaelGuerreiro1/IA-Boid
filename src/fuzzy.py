@@ -3,10 +3,6 @@ from skfuzzy import control as ctrl
 import numpy as np
 import pygame
 import math
-import matplotlib
-# Tive de por isto porque o matplotlib estava a crashar o pygame sem isto
-matplotlib.use('Agg') 
-import matplotlib.pyplot as plt
 
 # =========================================
 #        Zebras
@@ -17,7 +13,9 @@ class FuzzySystemBoid:
         self.config = config
         # Carregar configurações ou usar valores base
         self.perception_radius = getattr(config, 'perception_radius', 50)
-        self.max_speed = getattr(config, 'max_speed', 5)
+
+        self.max_speed_config = getattr(getattr(config, 'boids', None), 'MAX_SPEED', 5)
+        print(f"DEBUG: MAX_SPEED lido do JSON = {self.max_speed_config}")
 
         # Variáveis de estado para guardar o que o boid vê
         self.last_entity = None # n existe nenhum last quando criamos o objeto
@@ -51,7 +49,7 @@ class FuzzySystemBoid:
         # --- DISTÂNCIA ---
         self.Distancia['muito_perto'] = fuzz.trimf(self.Distancia.universe, [0, 0, 15])
         
-        # Testámos com Triangular mas tremia muito ( era instável), no que toca o output
+        # Testámos com Triangular mas era instável, no que toca o output
         # Com Trapezoidal na zona 'média', as zebras ficam mais estáveis na manada.
         self.Distancia['media'] = fuzz.trapmf(self.Distancia.universe, [10, 20, 40, 50]) 
         

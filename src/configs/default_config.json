@@ -15,7 +15,7 @@
   "boids": {
     "NUM_BOIDS": 10,
     "NUM_PREDATORS": 1,
-    "MAX_SPEED": 5,
+    "MAX_SPEED": 7,
     "MIN_SPEED": 1,
     "MAX_FORCE": 0.2,
     "VISUAL_RANGE": 80,
