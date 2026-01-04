@@ -151,7 +151,6 @@ class FuzzySystemBoid:
         self.boidz_sys.input['Velocidade'] = np.clip(avg_speed_diff, 0, 60)
         self.boidz_sys.input['Distancia_Hiena'] = np.clip(pred_dist, 0, 200)
 
-        # print(f"Dist: {avg_dist}, Dens: {density}") # Debug
 
         
         try:
