@@ -116,14 +116,13 @@ class FuzzySystemBoid:
 
         # --- Screen Wrap (Teletransporte) ---
         # Tivemos de implementar isto aqui porque senao os boids fugiam do ecra
-        try:# isto funciona como tentativa, mas como é acessório, caso haja algum erro vai para o except
-            w, h = pygame.display.get_surface().get_size() # retorna uma tupla quer da altura quer da largura
-            if current_entity.position.x > w: current_entity.position.x = 0 # passou do valor que tinhamos no eixo do x? volta ao incio do eixo
-            elif current_entity.position.x < 0: current_entity.position.x = w # movimento horizontal
-            if current_entity.position.y > h: current_entity.position.y = 0
-            elif current_entity.position.y < 0: current_entity.position.y = h
-        except:
-            pass
+        # isto funciona como tentativa, mas como é acessório, caso haja algum erro vai para o except
+        w, h = pygame.display.get_surface().get_size() # retorna uma tupla quer da altura quer da largura
+        if current_entity.position.x > w: current_entity.position.x = 0 # passou do valor que tinhamos no eixo do x? volta ao incio do eixo
+        elif current_entity.position.x < 0: current_entity.position.x = w # movimento horizontal
+        if current_entity.position.y > h: current_entity.position.y = 0
+        elif current_entity.position.y < 0: current_entity.position.y = h
+        
         # ------------------------------------
         # dentro desta lista vão ficar todos as zebras vizinhas
         #  incluindo apenas aquelas que estão dentro do seu raio de percepção, face à zebra atual.
@@ -155,10 +154,8 @@ class FuzzySystemBoid:
 
         # print(f"Dist: {avg_dist}, Dens: {density}") # Debug
 
-        try:
-            self.boidz_sys.compute()
-        except:
-            pass
+        self.boidz_sys.compute()
+        
 
     def compute(self):
         if self.last_entity is None:
@@ -225,7 +222,6 @@ class FuzzySystemBoid:
         return pygame.Vector2(0, 0)
 
     def _evasion_vector(self, entity, predators):
-        if not predators: return pygame.Vector2(0,0)
         steer = pygame.Vector2(0,0)
         closest = min(predators, key=lambda p: entity.position.distance_to(p.position))
         dist = entity.position.distance_to(closest.position)
@@ -313,14 +309,12 @@ class FuzzySystemPredator:
         self.last_boids = boids if boids else []
 
         # --- Screen Wrap (Predator) ---
-        try:
-            w, h = pygame.display.get_surface().get_size()
-            if current_entity.position.x > w: current_entity.position.x = 0
-            elif current_entity.position.x < 0: current_entity.position.x = w
-            if current_entity.position.y > h: current_entity.position.y = 0
-            elif current_entity.position.y < 0: current_entity.position.y = h
-        except:
-            pass
+        w, h = pygame.display.get_surface().get_size()
+        if current_entity.position.x > w: current_entity.position.x = 0
+        elif current_entity.position.x < 0: current_entity.position.x = w
+        if current_entity.position.y > h: current_entity.position.y = 0
+        elif current_entity.position.y < 0: current_entity.position.y = h
+        
 
         if not self.last_boids: return
 
@@ -340,10 +334,8 @@ class FuzzySystemPredator:
         self.boidz_sys.input['distancia'] = np.clip(dist, 0, 501)
         self.boidz_sys.input['alinhamento'] = np.clip(angle_diff, -180, 181)
 
-        try:
-            self.boidz_sys.compute()
-        except:
-            pass
+        self.boidz_sys.compute()
+        
 
     def compute(self, current_entity=None):
         if current_entity: self.last_entity = current_entity
