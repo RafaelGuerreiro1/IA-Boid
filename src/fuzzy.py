@@ -15,7 +15,6 @@ class FuzzySystemBoid:
         self.perception_radius = getattr(config, 'perception_radius', 50)
 
         self.max_speed_config = getattr(getattr(config, 'boids', None), 'MAX_SPEED', 5)
-        print(f"DEBUG: MAX_SPEED lido do JSON = {self.max_speed_config}")
 
         # Variáveis de estado para guardar o que o boid vê
         self.last_entity = None # n existe nenhum last quando criamos o objeto
@@ -116,7 +115,6 @@ class FuzzySystemBoid:
 
         # --- Screen Wrap (Teletransporte) ---
         # Tivemos de implementar isto aqui porque senao os boids fugiam do ecra
-        # isto funciona como tentativa, mas como é acessório, caso haja algum erro vai para o except
         w, h = pygame.display.get_surface().get_size() # retorna uma tupla quer da altura quer da largura
         if current_entity.position.x > w: current_entity.position.x = 0 # passou do valor que tinhamos no eixo do x? volta ao incio do eixo
         elif current_entity.position.x < 0: current_entity.position.x = w # movimento horizontal
@@ -161,24 +159,22 @@ class FuzzySystemBoid:
         if self.last_entity is None:
             return pygame.Vector2(0, 0)
         
-        try:
-            # Ler outputs do sistema Fuzzy
-            sep = self.boidz_sys.output.get('Forca_Separacao', 0)
-            coh = self.boidz_sys.output.get('Forca_Coesao', 0)
-            ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
-            eva = self.boidz_sys.output.get('Forca_Evasao', 0)
+        # Ler outputs do sistema Fuzzy
+        sep = self.boidz_sys.output.get('Forca_Separacao', 0)
+        coh = self.boidz_sys.output.get('Forca_Coesao', 0)
+        ali = self.boidz_sys.output.get('Forca_Alinhamento', 0)
+        eva = self.boidz_sys.output.get('Forca_Evasao', 0)
 
             # Aplicar multiplicadores para afinar o comportamento
-            v_sep = self._separation_vector(self.last_entity, self.last_boids) * sep * 1.2
-            v_coh = self._cohesion_vector(self.last_entity, self.last_boids) * coh
-            v_ali = self._alignment_vector(self.last_entity, self.last_boids) * ali * 2.0
-            v_eva = self._evasion_vector(self.last_entity, self.last_predators) * eva * 2.5
+        v_sep = self._separation_vector(self.last_entity, self.last_boids) * sep * 1.2
+        v_coh = self._cohesion_vector(self.last_entity, self.last_boids) * coh
+        v_ali = self._alignment_vector(self.last_entity, self.last_boids) * ali * 2.0
+        v_eva = self._evasion_vector(self.last_entity, self.last_predators) * eva * 2.5
             #Estes vetores são multiplicados pelo valor fuzzy correspondente 
             # ajustando intensidade da força.
 
-            return v_sep + v_coh + v_ali + v_eva
-        except:
-            return pygame.Vector2(0, 0)
+        return v_sep + v_coh + v_ali + v_eva
+    
 
     # Métodos auxiliares de vetores
     def _separation_vector(self, entity, boids):#calcula o vetor de separação de uma zebra em relação aos vizinhos
@@ -337,22 +333,20 @@ class FuzzySystemPredator:
         self.boidz_sys.compute()
         
 
-    def compute(self, current_entity=None):
-        if current_entity: self.last_entity = current_entity
-        if self.last_entity is None: return pygame.Vector2(0, 0)
+    def compute(self, current_entity):
+        if current_entity is None:
+            return pygame.Vector2(0, 0)
 
-        try:
-            outputs = getattr(self.boidz_sys, 'output', {})
-            mag = outputs.get('magnitude', 3)
-            corr = outputs.get('correcao_direcao', 0)
+        
+        outputs = getattr(self.boidz_sys, 'output', {})
+        mag = outputs.get('magnitude', 3)
+        corr = outputs.get('correcao_direcao', 0)
 
             # Aplicar a rotação e velocidade
-            new_angle = self.last_entity.angle + math.radians(corr)
-            desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
+        new_angle = self.last_entity.angle + math.radians(corr)
+        desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
             
-            return desired_vel - self.last_entity.velocity
-        except:
-            return pygame.Vector2(0, 0)
+        return desired_vel - self.last_entity.velocity
 
     def get_output_variables(self) -> list[str]:
         if not hasattr(self, 'boidz_controller'): return []
