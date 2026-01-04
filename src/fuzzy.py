@@ -118,13 +118,7 @@ class FuzzySystemBoid:
         
         
 
-        # --- Screen Wrap (Teletransporte) ---
-        # Tivemos de implementar isto aqui porque senao os boids fugiam do ecra
-        w, h = pygame.display.get_surface().get_size() # retorna uma tupla quer da altura quer da largura
-        if current_entity.position.x > w: current_entity.position.x = 0 # passou do valor que tinhamos no eixo do x? volta ao incio do eixo
-        elif current_entity.position.x < 0: current_entity.position.x = w # movimento horizontal
-        if current_entity.position.y > h: current_entity.position.y = 0
-        elif current_entity.position.y < 0: current_entity.position.y = h
+        
 
         # ------------------------------------
         # dentro desta lista vão ficar todos as zebras vizinhas
@@ -179,7 +173,9 @@ class FuzzySystemBoid:
         v_ali = self._alignment_vector(current_entity, boids_list) * ali * self.weight_alignment
         v_eva = self._evasion_vector(current_entity, predators_list) * eva * self.weight_evasion
 
-        self.cached_vector = v_sep + v_coh + v_ali + v_eva
+        v_wall = self._wall_avoidance_vector(current_entity) * 2.0 # Multiplicador forte para garantir que não sai
+
+        self.cached_vector = v_sep + v_coh + v_ali + v_eva + v_wall
         
 
     def compute(self):     
@@ -187,6 +183,34 @@ class FuzzySystemBoid:
     
 
     # Métodos auxiliares de vetores
+
+    def _wall_avoidance_vector(self, entity):
+        """
+        Cria uma força que empurra a entidade de volta para o centro
+        se ela estiver muito perto da borda.
+        """
+        steer = pygame.Vector2(0, 0)
+        margin = 50  # Margem de segurança (pixels)
+        turn_factor = 2.0 # Força com que empurra de volta (ajusta se necessário)
+
+        w, h = pygame.display.get_surface().get_size()
+
+        # Se estiver perto da esquerda, empurra para a direita
+        if entity.position.x < margin:
+            steer.x = turn_factor
+        # Se estiver perto da direita, empurra para a esquerda
+        elif entity.position.x > w - margin:
+            steer.x = -turn_factor
+        
+        # Se estiver perto do topo, empurra para baixo
+        if entity.position.y < margin:
+            steer.y = turn_factor
+        # Se estiver perto do fundo, empurra para cima
+        elif entity.position.y > h - margin:
+            steer.y = -turn_factor
+
+        return steer
+    
     def _separation_vector(self, entity, boids):#calcula o vetor de separação de uma zebra em relação aos vizinhos
         steer = pygame.Vector2(0, 0) #vetor acumulador que vai somar todas as forças de afastamento
         count = 0# Conta quantos vizinhos estão próximos, para depois calcular a média
@@ -251,7 +275,8 @@ class FuzzySystemBoid:
 
 class FuzzySystemPredator:
     def __init__(self, config):
-        self.config = config        
+        self.config = config  
+        self.max_speed = getattr(getattr(config, 'boids', None), 'MAX_SPEED', 5)   
 
         # ==== Setup Variables ====
         self.__setup_variables()
@@ -263,16 +288,15 @@ class FuzzySystemPredator:
         self.__setup_inference_system()
 
     def __setup_variables(self):
-        self.distancia = ctrl.Antecedent(np.arange(0, 502, 1), 'distancia')
-        self.alinhamento = ctrl.Antecedent(np.arange(-180, 182, 1), 'alinhamento') # assim faz 360
+        self.distancia = ctrl.Antecedent(np.arange(0, 501, 1), 'distancia')
+        self.alinhamento = ctrl.Antecedent(np.arange(-180, 181, 1), 'alinhamento') # assim faz 360
         
-        # Universo estendido para velocidade (até 16)
-        self.magnitude = ctrl.Consequent(np.arange(0, 16, 0.1), 'magnitude')
+        self.magnitude = ctrl.Consequent(np.arange(0, self.max_speed+1, 0.1), 'magnitude')
         self.correcao_direcao = ctrl.Consequent(np.arange(-90, 92, 1), 'correcao_direcao')
 
     def __setup_membership_functions(self):
         self.distancia['muito_perto'] = fuzz.trimf(self.distancia.universe, [0, 0, 100])
-        self.distancia['longe'] = fuzz.trimf(self.distancia.universe, [80, 500, 501])
+        self.distancia['longe'] = fuzz.trapmf(self.distancia.universe, [80, 200, 500, 500])
 
         # Alinhamento
         self.alinhamento['esquerda'] = fuzz.trimf(self.alinhamento.universe, [-180, -90, -10])
@@ -281,7 +305,6 @@ class FuzzySystemPredator:
         self.alinhamento['direita'] = fuzz.trimf(self.alinhamento.universe, [10, 90, 180])
 
         self.magnitude['lenta'] = fuzz.trimf(self.magnitude.universe, [0, 2, 8])
-        self.magnitude['rapida'] = fuzz.trimf(self.magnitude.universe, [5, 15, 15])
 
         self.correcao_direcao['forte_esq'] = fuzz.trimf(self.correcao_direcao.universe, [-90, -90, -30])
         self.correcao_direcao['nenhuma'] = fuzz.trimf(self.correcao_direcao.universe, [-15, 0, 15])
@@ -311,15 +334,13 @@ class FuzzySystemPredator:
 
         if not boids_list: 
             return
-
+        
         # --- Screen Wrap (Predator) ---
         w, h = pygame.display.get_surface().get_size()
         if current_entity.position.x > w: current_entity.position.x = 0
         elif current_entity.position.x < 0: current_entity.position.x = w
         if current_entity.position.y > h: current_entity.position.y = 0
         elif current_entity.position.y < 0: current_entity.position.y = h
-        
-
         
 
         #1 Encontrar a presa mais proxima
@@ -354,8 +375,11 @@ class FuzzySystemPredator:
             # Aplicar a rotação e velocidade
         new_angle = current_entity.angle + math.radians(corr)
         desired_vel = pygame.Vector2(math.cos(new_angle), math.sin(new_angle)) * mag
+
             
-        return desired_vel - current_entity.velocity
+        return desired_vel - current_entity.velocity 
+    
+    
 
     def get_output_variables(self) -> list[str]:
         if not hasattr(self, 'boidz_controller'): return []
